@@ -151,8 +151,8 @@ void draw(char *fn, const std::vector<std::vector<Point>>& tracks, const Point& 
 }
 
 int main(int argc, char **argv) {
-    if (argc < 8) {
-        std::cout << "Usage: " << argv[0] << " <data file> <lat1> <lon1> <lat2> <lon2> <width> <height>\n";
+    if (argc < 9) {
+        std::cout << "Usage: " << argv[0] << " <data file> <out file> <lat1> <lon1> <lat2> <lon2> <width> <height>\n";
         std::cout << "  lat1, lon1 and lat2, lon2 are the bounds of the output image\n";
         std::cout << "  height and width are the dimensions of the output image\n\n";
         std::cout << "Let t_i be the ith track, and p_i_j_lat, p_i_j_lon be the jth point of track i.\n";
