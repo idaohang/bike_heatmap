@@ -40,9 +40,37 @@ class TrackRaster {
 
 TrackRaster make_grid(const std::vector<Point>& track, std::function<std::pair<int, int>(const Point&)> conv, int radius) {
     TrackRaster tr;
+    std::pair<int,int> prev(-1, -1);
     for (auto p : track) {
         auto coords = conv(p);
-        tr.mark(coords.first, coords.second);
+        if (prev.first >= 0) {
+            // Bresenham's line algorithm
+            int x0 = prev.first;
+            int y0 = prev.second;
+            int x1 = coords.first;
+            int y1 = coords.second;
+            int dx = abs(x1 - x0);
+            int dy = abs(y1 - y0);
+            int sx = (x0 < x1) ? 1 : -1;
+            int sy = (y0 < y1) ? 1 : -1;
+            int err = dx - dy;
+
+            while (true) {
+                tr.mark(x0, y0);
+                if (x0 == x1 && y0 == y1)
+                    break;
+                int e2 = 2 * err;
+                if (e2 > -dy) {
+                    err -= dy;
+                    x0 += sx;
+                }
+                if (e2 < dx) {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+        prev = coords;
     }
     return std::move(tr);
 }
