@@ -1,11 +1,14 @@
+#include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <functional>
 #include <map>
 #include <set>
 #include <vector>
+#include <Magick++.h>
 
 struct Point {
     Point(double lat, double lon, bool radian=true) {
@@ -75,14 +78,13 @@ TrackRaster make_grid(const std::vector<Point>& track, std::function<std::pair<i
     return std::move(tr);
 }
 
-void write_color(std::fstream& f, int d, int low, int high) {
+void write_color(int d, int low, int high, unsigned char *rgb) {
     if (d > high)
         d = high;
 
     // Wrote the reverse of the color scheme I wanted, so just did 1 -
     // instead of recomputing...
     float v = 1 - ((float)(d - low)) / (high - low);
-    unsigned char rgb[3];
 
     if (d == 0) {
         rgb[0] = rgb[1] = rgb[2] = 0;
@@ -107,7 +109,6 @@ void write_color(std::fstream& f, int d, int low, int high) {
         rgb[1] = 255 * ((0.75 - v) / 0.25);
         rgb[2] = 255;
     }
-    f.write((char *)rgb, 3);
 }
 
 void draw(char *fn, const std::vector<std::vector<Point>>& tracks, const Point& p1, const Point& p2, int width, int height) {
@@ -120,11 +121,6 @@ void draw(char *fn, const std::vector<std::vector<Point>>& tracks, const Point& 
     double d_lon = fabs(p2.lon_r - p1.lon_r) / width;
     double max_lat = std::max(p2.lat_r, p1.lat_r);
     double min_lon = std::min(p2.lon_r, p1.lon_r);
-
-    std::fstream f(fn, std::fstream::out);
-    f << "P6 " << width << " " << height << " 255\n";
-    f.flush();
-    std::clog << "Wrote header\n";
 
     std::vector<TrackRaster> rasters;
 
@@ -144,6 +140,9 @@ void draw(char *fn, const std::vector<std::vector<Point>>& tracks, const Point& 
     std::clog << "Summarizing..." << std::endl;
     for (auto raster : rasters) {
         for (auto p : raster) {
+            if (p.first < 0 || p.first >= width ||
+                    p.second < 0 || p.second >= height)
+                continue;
             ++summary[p];
         }
     }
@@ -167,18 +166,25 @@ void draw(char *fn, const std::vector<std::vector<Point>>& tracks, const Point& 
     std::clog << "Done summarizing" << std::endl;
 
     std::clog << "Writing..." << std::endl;
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            auto d = summary[std::pair<int, int>(x, y)];
-            write_color(f, d, cold_val, hot_val);
-        }
+    unsigned char *pixels = new unsigned char[height * width * 3];
+    unsigned char *p = pixels;
+    memset(pixels, 0, height * width * 3);
+    for (auto ent : summary) {
+        auto x = ent.first.first;
+        auto y = ent.first.second;
+        assert(x < width);
+        assert(y < height);
+        assert(x >= 0);
+        assert(y >= 0);
+        write_color(ent.second, cold_val, hot_val, pixels + (y * width + x) * 3);
     }
-
-    f.flush();
-    f.close();
+    Magick::Image img(width, height, "RGB", MagickCore::StorageType::CharPixel, pixels);
+    img.write(fn);
+    delete [] pixels;
 }
 
 int main(int argc, char **argv) {
+    Magick::InitializeMagick(*argv);
     if (argc < 9) {
         std::cout << "Usage: " << argv[0] << " <data file> <out file> <lat1> <lon1> <lat2> <lon2> <width> <height>\n";
         std::cout << "  lat1, lon1 and lat2, lon2 are the bounds of the output image\n";
